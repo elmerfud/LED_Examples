@@ -1,0 +1,3 @@
+LED examples for the LPD8806 & WS2801 libraries.  
+
+These are modified versions of the example files included with the Adafruit LPD8806 & WS2801 libraries.  These have been modified to be used with my fork of the Adafruit libraries.  My fork of the libraries have been tweeked to allow them to be completely interchangeable with each other.  You simply include the library, setup the class and all functions will be identical.  
