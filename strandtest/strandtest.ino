@@ -77,13 +77,23 @@ void setup() {
   strip.show();
 }
 
-
 void loop() {
   // Some example procedures showing how to display to the pixels
   
-  colorWipe(Color(255, 0, 0), 50);
-  colorWipe(Color(0, 255, 0), 50);
-  colorWipe(Color(0, 0, 255), 50);
+  colorChase(Color(255,255,255), 10);     // white
+  colorChase(Color(255,0,0), 10);         // red
+  colorChase(Color(255,255,0), 10);       // orange
+  colorChase(Color(0,255,0), 10);         // green
+  colorChase(Color(0,255,255), 10);       // teal
+  colorChase(Color(0,0,255), 10);         // blue
+  colorChase(Color(255,0,255), 10);       // violet
+  
+  // fill the entire strip with...
+  colorWipe(Color(255, 0, 0), 50); // red
+  colorWipe(Color(0, 255, 0), 50); // green
+  colorWipe(Color(0, 0, 255), 50); // blue
+  
+  // taste the rainbow!
   rainbow(20);
   rainbowCycle(20);
 }
@@ -129,6 +139,28 @@ void colorWipe(uint32_t c, uint8_t wait) {
       delay(wait);
   }
 }
+
+// Chase a dot down the strip
+// good for testing purposes
+void colorChase(uint32_t c, uint8_t wait) {
+  int i;
+
+  for (i=0; i < strip.numPixels(); i++) {
+    strip.setPixelColor(i, 0);  // turn all pixels off
+  }
+
+  for (i=0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, c);
+      if (i == 0) {
+        strip.setPixelColor(strip.numPixels()-1, 0);
+      } else {
+        strip.setPixelColor(i-1, 0);
+      }
+      strip.show();
+      delay(wait);
+  }
+}
+
 
 /* Helper functions */
 
