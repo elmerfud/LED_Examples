@@ -16,9 +16,9 @@
 #include "TimerOne.h"
 
 /* Use this */
-#include "Adafruit_WS2801.h"
+#include "LED_WS2801.h"
 /* or this */
-//#include "Adafruit_LPD8806.h"
+//#include "LED_LPD8806.h"
 /* But not both 
  and be sure to modify which class is called below!
  */ 
@@ -43,16 +43,15 @@ const int numPixels = 32;
 
 // Instantiate LED strip; arguments are the total number of pixels in strip,
 // the data pin number and clock pin number:
-//Adafruit_WS2801 strip = Adafruit_WS2801(numPixels, dataPin, clockPin);
-//Adafruit_LPD8806 strip = Adafruit_LPD8806(numPixels, dataPin, clockPin);
+//LED_WS2801 strip = LED_WS2801(numPixels, dataPin, clockPin);
+//LED_LPD8806 strip = LED_LPD8806(numPixels, dataPin, clockPin);
 
 // You can also use hardware SPI for ultra-fast writes by omitting the data
 // and clock pin arguments.  This is faster, but the data and clock are then
 // fixed to very specific pin numbers: on Arduino 168/328, data = pin 11,
 // clock = pin 13.  On Mega, data = pin 51, clock = pin 52.
-//LPD8806 strip = LPD8806(numPixels);
-Adafruit_WS2801 strip = Adafruit_WS2801(numPixels);
-//Adafruit_LPD8806 strip = Adafruit_LPD8806(numPixels);
+LED_WS2801 strip = LED_WS2801(numPixels);
+//LED_LPD8806 strip = LED_LPD8806(numPixels);
 
 // Principle of operation: at any given time, the LEDs depict an image or
 // animation effect (referred to as the "back" image throughout this code).
@@ -75,6 +74,8 @@ void renderEffect00(byte idx);
 void renderEffect01(byte idx);
 void renderEffect02(byte idx);
 void renderEffect03(byte idx);
+void renderEffect04(byte idx);
+void renderEffect05(byte idx);
 void renderAlpha00(void);
 void renderAlpha01(void);
 void renderAlpha02(void);
@@ -92,7 +93,9 @@ void (*renderEffect[])(byte) = {
   renderEffect00,
   renderEffect01,
   renderEffect02,
-  renderEffect03 },
+  renderEffect03,
+  renderEffect04,
+  renderEffect05 },
 (*renderAlpha[])(void)  = {
   renderAlpha00,
   renderAlpha01,
@@ -188,7 +191,7 @@ void callback() {
   } else if(tCounter >= transitionTime) { // End transition
     fxIdx[backImgIdx] = fxIdx[frontImgIdx]; // Move front effect index to back
     backImgIdx        = 1 - backImgIdx;     // Invert back index
-    tCounter          = -120 - random(240); // Hold image 2 to 6 seconds
+    tCounter          = -120 - random(600); // Hold image 2 to 10 seconds
   }
 }
 
@@ -271,7 +274,7 @@ void renderEffect02(byte idx) {
   byte *ptr = &imgData[idx][0];
   int  foo;
   long color, i;
-  for(long i=0; i<numPixels; i++) {
+  for(i=0; i<numPixels; i++) {
     foo = fixSin(fxVars[idx][4] + fxVars[idx][2] * i / numPixels);
     // Peaks of sine wave are white, troughs are black, mid-range
     // values are pure hue (100% saturated).
@@ -331,6 +334,81 @@ void renderEffect03(byte idx) {
 
   fxVars[idx][4] += fxVars[idx][2];
   if(fxVars[idx][4] >= 720) fxVars[idx][4] -= 720;
+}
+
+// Pulse entire image with solid color
+void renderEffect04(byte idx) {
+  if(fxVars[idx][0] == 0) {
+    fxVars[idx][1] = 50; // Pulse ammount min (v)
+    fxVars[idx][2] = 250; // Pulse ammount max (v)
+    fxVars[idx][3] = random(1536); // Random hue
+    
+    fxVars[idx][4] = fxVars[idx][1]; // pulse position 
+    fxVars[idx][5] = 1; // 0 = negative, 1 = positive
+    fxVars[idx][6] = 2 + random(10); // step value
+    fxVars[idx][0] = 1; // Effect initialized
+  }
+  
+  byte *ptr = &imgData[idx][0];
+  long color, i;
+  for(i=0; i<numPixels; i++) {
+    color = hsv2rgb(fxVars[idx][3], 255, fxVars[idx][4]);
+    *ptr++ = color >> 16; *ptr++ = color >> 8; *ptr++ = color;
+  }
+  
+  if (fxVars[idx][5] == 0) {
+    fxVars[idx][4] = fxVars[idx][4] - fxVars[idx][6];
+    if (fxVars[idx][4] <= fxVars[idx][1]) {
+      fxVars[idx][5] = 1;
+      fxVars[idx][4] = fxVars[idx][1];
+    }
+  } else if (fxVars[idx][5] == 1) {
+    fxVars[idx][4] = fxVars[idx][4] + fxVars[idx][6];
+    if (fxVars[idx][4] >= fxVars[idx][2]) {
+      fxVars[idx][5] = 0;
+      fxVars[idx][4] = fxVars[idx][2];
+    }
+  }
+}
+
+// larson scanner effect
+void renderEffect05(byte idx) {
+  if(fxVars[idx][0] == 0) { // Initialize effect?
+    fxVars[idx][1] = random(1536); // Random hue for 'Eye'
+    fxVars[idx][2] = (fxVars[idx][1] >= 768) ?  // background hue is 180 degrees opposie
+      (fxVars[idx][1] - 768) : (fxVars[idx][1] + 768); 
+    // Frame-to-frame increment (speed) -- may be positive or negative,
+    // but magnitude shouldn't be so small as to be boring.  It's generally
+    // still less than a full pixel per frame, making motion very smooth.
+    fxVars[idx][3] = 10 + random(10);  // eye speed in fps.  not too fast not too slow
+    fxVars[idx][4] = 0; // Current position
+    fxVars[idx][5] = 5; // Eye size 0 - 127, generally 0-5 is what you want
+                        // look as the sin table, picks how far down the table 
+                        // we look.
+    fxVars[idx][0] = 1; // Effect initialized
+  }
+
+  byte *ptr = &imgData[idx][0];
+  int  foo;
+  long color, i;
+  for(i=0; i<numPixels; i++) {
+    // Use cos to determine the position of the eye as if it's a circle
+    // since it use 1/2 degree increments and we use 720 here
+    foo = fixCos(fxVars[idx][4] + 720 * i / numPixels);
+    color = (foo >= (127 - fxVars[idx][5])) ?
+       hsv2rgb(fxVars[idx][1], 255, 255) :
+       hsv2rgb(fxVars[idx][2], 255, 127);
+    *ptr++ = color >> 16; *ptr++ = color >> 8; *ptr++ = color;
+  }
+  fxVars[idx][4] += fxVars[idx][3];
+  
+  // Flip directions when we reach the end
+  if (fxVars[idx][4] <= 0) {
+    fxVars[idx][3] = fxVars[idx][3] * -1;
+  } else if (fxVars[idx][4] >= 720) {
+    fxVars[idx][3] = fxVars[idx][3] * -1;
+  }
+  
 }
 
 // TO DO: Add more effects here...Larson scanner, etc.
@@ -407,31 +485,25 @@ void renderAlpha02(void) {
 // Gamma correction compensates for our eyes' nonlinear perception of
 // intensity.  It's the LAST step before a pixel value is stored, and
 // allows intermediate rendering/processing to occur in linear space.
-// The table contains 256 elements (8 bit input), though the outputs are
-// only 7 bits (0 to 127).  This is normal and intentional by design: it
-// allows all the rendering code to operate in the more familiar unsigned
-// 8-bit colorspace (used in a lot of existing graphics code), and better
-// preserves accuracy where repeated color blending operations occur.
-// Only the final end product is converted to 7 bits, the native format
-// for the LPD8806 LED driver.  Gamma correction and 7-bit decimation
-// thus occur in a single operation.
+// The table contains 256 elements (8 bit input).  
+
 PROGMEM prog_uchar gammaTable[]  = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,
-    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,
-    2,  2,  2,  2,  2,  3,  3,  3,  3,  3,  3,  3,  3,  4,  4,  4,
-    4,  4,  4,  4,  5,  5,  5,  5,  5,  6,  6,  6,  6,  6,  7,  7,
-    7,  7,  7,  8,  8,  8,  8,  9,  9,  9,  9, 10, 10, 10, 10, 11,
-   11, 11, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 15, 15, 16, 16,
-   16, 17, 17, 17, 18, 18, 18, 19, 19, 20, 20, 21, 21, 21, 22, 22,
-   23, 23, 24, 24, 24, 25, 25, 26, 26, 27, 27, 28, 28, 29, 29, 30,
-   30, 31, 32, 32, 33, 33, 34, 34, 35, 35, 36, 37, 37, 38, 38, 39,
-   40, 40, 41, 41, 42, 43, 43, 44, 45, 45, 46, 47, 47, 48, 49, 50,
-   50, 51, 52, 52, 53, 54, 55, 55, 56, 57, 58, 58, 59, 60, 61, 62,
-   62, 63, 64, 65, 66, 67, 67, 68, 69, 70, 71, 72, 73, 74, 74, 75,
-   76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
-   92, 93, 94, 95, 96, 97, 98, 99,100,101,102,104,105,106,107,108,
-  109,110,111,113,114,115,116,117,118,120,121,122,123,125,126,127
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+    1,  1,  2,  2,  2,  2,  2,  2,  2,  2,  2,  3,  3,  3,  3,  3,
+    3,  3,  4,  4,  4,  4,  4,  4,  5,  5,  5,  5,  6,  6,  6,  6,
+    6,  7,  7,  7,  8,  8,  8,  8,  9,  9,  9, 10, 10, 10, 11, 11,
+   12, 12, 12, 13, 13, 14, 14, 15, 15, 15, 16, 16, 17, 18, 18, 19,
+   19, 20, 20, 21, 21, 22, 23, 23, 24, 25, 25, 26, 27, 28, 28, 29,
+   30, 31, 31, 32, 33, 34, 35, 36, 37, 38, 38, 39, 40, 41, 42, 43,
+   44, 45, 47, 48, 49, 50, 51, 52, 53, 55, 56, 57, 58, 60, 61, 62,
+   64, 65, 66, 68, 69, 71, 72, 74, 75, 77, 78, 80, 82, 83, 85, 87,
+   88, 90, 92, 94, 96, 98, 99,101,103,105,107,109,111,113,115,118,
+  120,122,124,126,129,131,133,136,138,141,143,146,148,151,153,156,
+  158,161,164,167,169,172,175,178,181,184,187,190,193,196,199,203,
+  206,209,212,216,219,222,226,229,233,237,240,244,247,251,253,255
 };
 
 // This function (which actually gets 'inlined' anywhere it's called)
